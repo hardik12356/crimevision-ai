@@ -1,0 +1,854 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CrimeVisionAI — Forensic Investigation Workstation</title>
+  <script>
+    (function() {
+      try {
+        var savedTheme = localStorage.getItem('crimevision_theme') || 'dark';
+        document.documentElement.setAttribute('data-theme', savedTheme);
+      } catch (e) {}
+    })();
+  </script>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+
+  <!-- App Header -->
+  <header class="app-header">
+    <div class="header-left">
+      <div class="brand-section">
+        <div class="brand-icon" aria-hidden="true">CV</div>
+        <div class="brand-text">
+          <h1 class="brand-title">CrimeVision<span class="brand-accent">AI</span></h1>
+          <span class="brand-subtitle">Forensic Investigation Workstation</span>
+        </div>
+      </div>
+
+      <div class="header-case-control">
+        <label for="case-select" class="visually-hidden">Active Investigation Case</label>
+        <span class="case-nav-icon" aria-hidden="true">📁</span>
+        <select id="case-select" class="form-select case-select" aria-label="Select active case"></select>
+        <button class="btn btn-secondary btn-sm" id="btn-open-new-case" type="button" title="Initialize new investigation case">+ New Case</button>
+      </div>
+    </div>
+
+    <div class="header-right">
+      <div class="header-meta">
+        <span class="badge badge-case" id="header-case-badge" title="Active investigation case">Case: CASE-2026-MVP-001</span>
+        <span class="badge badge-status-neutral" id="header-audio-badge" title="Audio Modality Status">Audio: Checking</span>
+        <span class="badge badge-status-neutral" id="header-image-badge" title="Image Modality Status">Images: Checking</span>
+        <span class="badge badge-status-neutral" id="header-video-badge" title="Video Modality Status">Video: Checking</span>
+      </div>
+
+      <button id="btn-theme-toggle" class="btn-theme-toggle" type="button" aria-label="Toggle dark/light theme" title="Toggle dark/light theme">
+        <span class="theme-icon" aria-hidden="true">☀️</span>
+        <span class="theme-label">Light Mode</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- Main Container -->
+  <main class="dashboard-container">
+
+    <!-- Compact Case Overview Bar -->
+    <section class="case-bar" aria-label="Investigation Case Overview">
+      <div class="case-meta-display">
+        <div class="case-title-row">
+          <span class="case-label-chip">Active Case</span>
+          <strong class="case-title-text" id="case-title-display">MVP Forensic Investigation</strong>
+        </div>
+        <p class="case-desc-text" id="case-desc-display">Default investigation workspace for session evidence.</p>
+      </div>
+
+      <div class="overview-grid" aria-label="Investigation Metrics">
+        <div class="stat-card">
+          <span class="stat-label">Active Evidence</span>
+          <span class="stat-value" id="stat-evidence-count">0</span>
+          <span class="stat-subtext">Case locker items</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-label">Timeline Events</span>
+          <span class="stat-value" id="stat-event-count">0</span>
+          <span class="stat-subtext">Chronologically anchored</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-label" id="stat-duration-label">Media Duration</span>
+          <span class="stat-value" id="stat-duration">—</span>
+          <span class="stat-subtext" id="stat-duration-sub">Active inspection file</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-label">System State</span>
+          <span class="stat-value" id="stat-status">IDLE</span>
+          <span class="stat-subtext">Analysis pipeline</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Three-Pane Forensic Workbench Layout -->
+    <div class="forensic-workbench">
+
+      <!-- =================================================================== -->
+      <!-- LEFT PANE: Evidence Manager (Locker, Ingestion, Exports)            -->
+      <!-- =================================================================== -->
+      <aside class="pane-column pane-evidence-manager" aria-label="Evidence Management">
+
+        <!-- Case Evidence Locker Panel -->
+        <section class="panel" id="case-evidence-panel" aria-labelledby="evidence-locker-title">
+          <div class="panel-header">
+            <h2 class="panel-title" id="evidence-locker-title">
+              <span class="panel-title-icon" aria-hidden="true">🗄️</span> Case Evidence Locker
+            </h2>
+            <span class="badge badge-case" id="case-evidence-count-badge">0 Items</span>
+          </div>
+          <div class="panel-body">
+            <div id="evidence-empty-notice" class="evidence-empty-box">
+              <p class="empty-primary">No evidence files recorded.</p>
+              <p class="evidence-empty-sub">Ingest audio, image, or video surveillance below.</p>
+            </div>
+            <div class="evidence-locker-list" id="case-evidence-list" style="display: none;"></div>
+          </div>
+        </section>
+
+        <!-- Evidence Ingestion Panel -->
+        <section class="panel ingestion-panel" aria-labelledby="upload-panel-title">
+          <div class="panel-header">
+            <h2 class="panel-title" id="upload-panel-title">
+              <span id="ingestion-panel-icon" class="panel-title-icon" aria-hidden="true">🎙️</span> Evidence Ingestion
+            </h2>
+            <div class="tab-button-group" role="tablist" aria-label="Ingestion Modality Selection">
+              <button type="button" class="badge badge-status-ready tab-btn active-tab" id="tab-audio" role="tab" aria-selected="true">Audio</button>
+              <button type="button" class="badge badge-status-ready tab-btn" id="tab-image" role="tab" aria-selected="false">Image</button>
+              <button type="button" class="badge badge-status-ready tab-btn" id="tab-video" role="tab" aria-selected="false">Video</button>
+            </div>
+          </div>
+          <div class="panel-body">
+            <div id="upload-alert-box"></div>
+
+            <!-- Audio Upload Section -->
+            <div id="audio-upload-section">
+              <div class="upload-dropzone" id="audio-dropzone" tabindex="0" role="button" aria-label="Audio file upload dropzone">
+                <div class="upload-icon" aria-hidden="true">🔊</div>
+                <p class="upload-prompt">Drop audio evidence here or browse</p>
+                <p class="upload-sub">WAV, MP3, M4A, FLAC, OGG, AAC (Max 100 MB)</p>
+                <input type="file" id="audio-file-input" class="file-input-hidden" accept=".wav,.mp3,.m4a,.flac,.ogg,.aac,.wma">
+              </div>
+
+              <div class="selected-file-display" id="selected-file-box" style="display: none;">
+                <span class="selected-file-name" id="selected-file-name"></span>
+                <span class="badge badge-status-ready">Ready</span>
+              </div>
+
+              <div class="form-group">
+                <label for="language-select" class="form-label">Language Detection / Hint</label>
+                <select id="language-select" class="form-select">
+                  <option value="">Auto-detect (Recommended)</option>
+                  <option value="en">English (en)</option>
+                  <option value="te">Telugu (te)</option>
+                  <option value="hi">Hindi (hi)</option>
+                  <option value="fr">French (fr)</option>
+                </select>
+              </div>
+
+              <div class="btn-group">
+                <button class="btn btn-primary" id="btn-analyze-audio" disabled type="button">
+                  ⚡ Analyze Audio Evidence
+                </button>
+                <button class="btn btn-secondary" id="btn-reset-audio" title="Reset analysis" type="button">
+                  ↺ Reset
+                </button>
+              </div>
+            </div>
+
+            <!-- Image Upload Section -->
+            <div id="image-upload-section" style="display: none;">
+              <div class="upload-dropzone" id="image-dropzone" tabindex="0" role="button" aria-label="Image file upload dropzone">
+                <div class="upload-icon" aria-hidden="true">🖼️</div>
+                <p class="upload-prompt">Drop image evidence here or browse</p>
+                <p class="upload-sub">JPG, JPEG, PNG, BMP, WEBP, TIFF (Max 100 MB)</p>
+                <input type="file" id="image-file-input" class="file-input-hidden" accept=".jpg,.jpeg,.png,.bmp,.webp,.tiff">
+              </div>
+
+              <div class="selected-file-display" id="image-selected-file-box" style="display: none;">
+                <span class="selected-file-name" id="image-selected-file-name"></span>
+                <span class="badge badge-status-ready">Ready</span>
+              </div>
+
+              <div class="form-group">
+                <label for="confidence-threshold" class="form-label">Detection Confidence Threshold</label>
+                <select id="confidence-threshold" class="form-select">
+                  <option value="0.25">0.25 — Default (RT-DETR)</option>
+                  <option value="0.4">0.40 — Balanced</option>
+                  <option value="0.5">0.50 — Conservative</option>
+                  <option value="0.6">0.60 — High Precision</option>
+                </select>
+              </div>
+
+              <div class="btn-group">
+                <button class="btn btn-primary" id="btn-analyze-image" disabled type="button">
+                  ⚡ Analyze Image Evidence
+                </button>
+                <button class="btn btn-secondary" id="btn-reset-image" title="Reset image analysis" type="button">
+                  ↺ Reset
+                </button>
+              </div>
+            </div>
+
+            <!-- Video Upload Section -->
+            <div id="video-upload-section" style="display: none;">
+              <div class="upload-dropzone" id="video-dropzone" tabindex="0" role="button" aria-label="Video file upload dropzone">
+                <div class="upload-icon" aria-hidden="true">🎬</div>
+                <p class="upload-prompt">Drop video surveillance here or browse</p>
+                <p class="upload-sub">MP4, MOV, AVI, MKV, WEBM (Max 100 MB, 1 FPS)</p>
+                <input type="file" id="video-file-input" class="file-input-hidden" accept=".mp4,.mov,.avi,.mkv,.webm">
+              </div>
+
+              <div class="selected-file-display" id="video-selected-file-box" style="display: none;">
+                <span class="selected-file-name" id="video-selected-file-name"></span>
+                <span class="badge badge-status-ready">Ready</span>
+              </div>
+
+              <div class="form-group">
+                <label for="video-confidence-threshold" class="form-label">Detection Confidence Threshold</label>
+                <select id="video-confidence-threshold" class="form-select">
+                  <option value="0.25">0.25 — Default (RT-DETR)</option>
+                  <option value="0.4">0.40 — Balanced</option>
+                  <option value="0.5">0.50 — Conservative</option>
+                </select>
+              </div>
+
+              <div class="btn-group">
+                <button class="btn btn-primary" id="btn-analyze-video" disabled type="button">
+                  ⚡ Analyze Video Evidence
+                </button>
+                <button class="btn btn-secondary" id="btn-reset-video" title="Reset video analysis" type="button">
+                  ↺ Reset
+                </button>
+              </div>
+            </div>
+
+          </div>
+        </section>
+
+        <!-- Case Reports & Exports -->
+        <section class="panel export-panel" aria-labelledby="report-panel-title">
+          <div class="panel-header">
+            <h2 class="panel-title" id="report-panel-title">
+              <span class="panel-title-icon" aria-hidden="true">📄</span> Case Exports &amp; Reports
+            </h2>
+          </div>
+          <div class="panel-body">
+            <p class="export-desc">
+              Export verified case metadata, timeline audit traces, and official investigative reports.
+            </p>
+            <div id="export-status" class="export-status" style="display: none;"></div>
+            <div class="export-btn-group">
+              <button class="btn btn-secondary btn-sm" id="btn-export-json" disabled type="button" title="Download raw JSON case audit">
+                💾 JSON Audit
+              </button>
+              <button class="btn btn-primary btn-sm" id="btn-export-pdf" disabled title="Download formatted A4 PDF forensic report" type="button">
+                📑 PDF Report
+              </button>
+            </div>
+          </div>
+        </section>
+
+      </aside>
+
+      <!-- =================================================================== -->
+      <!-- CENTER PANE: Primary Media Inspection Stage (Dominant Center Stage) -->
+      <!-- =================================================================== -->
+      <section class="pane-column pane-media-stage" aria-label="Media Inspection Stage">
+
+        <!-- Media Stage Main Viewer Box -->
+        <div class="panel media-viewer-panel">
+          <div class="panel-header media-stage-header">
+            <div class="media-stage-title-wrap">
+              <span id="inspecting-media-type-icon" class="media-type-icon" aria-hidden="true">🔍</span>
+              <div class="media-stage-heading">
+                <span class="media-stage-sublabel">Primary Inspection Canvas</span>
+                <h2 class="inspecting-filename" id="inspecting-filename">Awaiting Evidence Selection</h2>
+              </div>
+            </div>
+            <span class="badge badge-status-neutral" id="inspecting-badge">No Media Loaded</span>
+          </div>
+
+          <div class="media-stage-body">
+            <!-- Media Stage Display Canvas -->
+            <div class="media-stage-canvas" id="media-stage-canvas">
+              <!-- Real Video Player Element (Preserved ID) -->
+              <video id="video-player-preview" controls class="video-preview-player" playsinline style="display: none;"></video>
+
+              <!-- Image Viewer Canvas (Supported via /api/evidence/<id>/media) -->
+              <div id="image-viewer-container" class="image-viewer-canvas" style="display: none;">
+                <img id="image-preview" class="image-preview-element" alt="Selected forensic image evidence" />
+              </div>
+
+              <!-- Audio Inspection Waveform Placeholder -->
+              <div id="audio-viewer-container" class="audio-viewer-canvas" style="display: none;">
+                <div class="audio-visual-banner">
+                  <div class="audio-wave-anim" aria-hidden="true">
+                    <span></span><span></span><span></span><span></span><span></span><span></span><span></span>
+                  </div>
+                  <span id="audio-viewer-info" class="audio-viewer-info">Audio Inspection Mode Active</span>
+                </div>
+              </div>
+
+              <!-- Empty State Placeholder -->
+              <div id="media-empty-placeholder" class="media-empty-canvas">
+                <div class="empty-icon" aria-hidden="true">🎯</div>
+                <h3 class="empty-headline">Forensic Media Inspection Canvas</h3>
+                <p class="empty-caption">
+                  Select an item from the <strong>Case Evidence Locker</strong> to inspect high-resolution surveillance video, full-scale imagery, or speech acoustic segments.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ================================================================= -->
+        <!-- INCIDENT HYPOTHESIS SECTION (Directly below Primary Inspection Canvas) -->
+        <!-- ================================================================= -->
+        <section class="panel hypothesis-panel" id="incident-hypothesis-panel" aria-labelledby="incident-hypothesis-title">
+          <div class="panel-header hypothesis-panel-header">
+            <div class="panel-title-wrap">
+              <h2 class="panel-title" id="incident-hypothesis-title">
+                <span class="panel-title-icon" aria-hidden="true">💡</span> Incident Hypothesis
+              </h2>
+              <span class="badge badge-caveat">AI Evidence Synthesis</span>
+            </div>
+            <div class="hypothesis-header-actions">
+              <span class="badge badge-case" id="hypothesis-status-badge">Awaiting Evaluation</span>
+              <button class="btn btn-secondary btn-xs" id="btn-refresh-hypothesis" type="button" title="Synthesize available evidence and generate candidate hypotheses">
+                ⚡ Evaluate Hypothesis
+              </button>
+            </div>
+          </div>
+          <div class="panel-body hypothesis-panel-body">
+
+            <!-- Loading State -->
+            <div id="hypothesis-loading" class="hypothesis-state-box" style="display: none;">
+              <div class="spinner-small" aria-hidden="true"></div>
+              <p class="state-headline">Synthesizing Case Evidence...</p>
+              <p class="state-caption">Extracting audio claims, visual detections, timeline anchors, and cross-modal corroborations.</p>
+            </div>
+
+            <!-- Empty / Insufficient Evidence State -->
+            <div id="hypothesis-empty" class="hypothesis-state-box">
+              <div class="empty-icon" aria-hidden="true">⚖️</div>
+              <h3 class="empty-headline" id="hypothesis-empty-title">No Incident Hypothesis Evaluated Yet</h3>
+              <p class="empty-caption" id="hypothesis-empty-sub">
+                Ingest case evidence (video, audio, or images) and click <strong>Evaluate Hypothesis</strong> to synthesize candidate incident types grounded in recorded findings.
+              </p>
+            </div>
+
+            <!-- Error State -->
+            <div id="hypothesis-error" class="hypothesis-state-box" style="display: none;">
+              <div class="empty-icon text-danger" aria-hidden="true">⚠️</div>
+              <h3 class="empty-headline text-danger" id="hypothesis-error-title">Evaluation Error</h3>
+              <p class="empty-caption text-danger" id="hypothesis-error-sub">Unable to evaluate case hypotheses.</p>
+              <button class="btn btn-secondary btn-xs" id="btn-retry-hypothesis" type="button">Retry Evaluation</button>
+            </div>
+
+            <!-- Active Hypothesis Display Content -->
+            <div id="hypothesis-content" class="hypothesis-content-container" style="display: none;">
+
+              <!-- 1. Primary Candidate Incident Card -->
+              <div class="hyp-card hyp-primary-card">
+                <div class="hyp-card-header">
+                  <div class="hyp-title-group">
+                    <span class="hyp-card-eyebrow">Primary Candidate Incident</span>
+                    <h3 class="hyp-candidate-title" id="hyp-primary-type">Undetermined Incident</h3>
+                  </div>
+                  <span class="badge hyp-plausibility-badge" id="hyp-plausibility-badge">Moderate</span>
+                </div>
+                <p class="hyp-narrative-text" id="hyp-primary-narrative"></p>
+              </div>
+
+              <!-- 2. Alternative Hypotheses Section -->
+              <div class="hyp-section-group" id="hyp-alternatives-group" style="display: none;">
+                <h4 class="hyp-group-title">
+                  <span aria-hidden="true">🔀</span> Alternative Candidate Hypotheses
+                </h4>
+                <div class="hyp-alternatives-list" id="hyp-alternatives-list"></div>
+              </div>
+
+              <!-- 3. Supporting Evidence Section -->
+              <div class="hyp-section-group" id="hyp-supporting-group">
+                <h4 class="hyp-group-title">
+                  <span aria-hidden="true">📌</span> Supporting Evidence &amp; Provenance
+                </h4>
+                <ul class="hyp-provenance-list" id="hyp-supporting-list"></ul>
+              </div>
+
+              <!-- 4. Contradictory or Conflicting Evidence Section -->
+              <div class="hyp-section-group" id="hyp-contradictions-group">
+                <h4 class="hyp-group-title hyp-title-warning">
+                  <span aria-hidden="true">⚡</span> Contradictory / Conflicting Findings
+                </h4>
+                <ul class="hyp-conflict-list" id="hyp-contradictions-list"></ul>
+              </div>
+
+              <!-- 5. Evidence Gaps & Forensic Limitations Section -->
+              <div class="hyp-section-group" id="hyp-gaps-group">
+                <h4 class="hyp-group-title hyp-title-muted">
+                  <span aria-hidden="true">⚠️</span> Evidence Gaps &amp; Analysis Limitations
+                </h4>
+                <ul class="hyp-gaps-list" id="hyp-gaps-list"></ul>
+              </div>
+
+              <!-- 6. Overall Assessment Section -->
+              <div class="hyp-section-group hyp-assessment-section" id="hyp-assessment-group">
+                <h4 class="hyp-group-title">
+                  <span aria-hidden="true">📋</span> Overall Assessment &amp; Verification Guidance
+                </h4>
+                <p class="hyp-assessment-text" id="hyp-overall-assessment"></p>
+              </div>
+
+              <!-- Forensic Disclaimer Banner -->
+              <div class="hyp-disclaimer-banner">
+                ⚠️ <strong>Forensic Safeguard:</strong> Hypotheses are probabilistic decision-support interpretations. Model detections and witness claims are unverified legal facts. Independent human review of original recordings is strictly required.
+              </div>
+
+            </div>
+
+          </div>
+        </section>
+
+        <!-- ================================================================= -->
+        <!-- Findings & Forensic Observations (Organized directly below media) -->
+        <!-- ================================================================= -->
+
+        <!-- Video Analysis Results Panel (Epic 4) -->
+        <section class="panel results-panel" id="video-results-panel" style="display: none;" aria-labelledby="video-results-title">
+          <div class="panel-header">
+            <h2 class="panel-title" id="video-results-title">
+              <span class="panel-title-icon" aria-hidden="true">🎬</span> Video Analysis Results
+            </h2>
+            <span class="badge badge-case" id="video-frames-count-badge">0 Frames</span>
+          </div>
+          <div class="panel-body">
+            <!-- Video Facts -->
+            <div id="video-facts-container">
+              <div class="facts-grid">
+                <div class="fact-item">
+                  <span class="fact-key">Source Video</span>
+                  <p class="fact-val" id="video-fact-file">--</p>
+                </div>
+                <div class="fact-item">
+                  <span class="fact-key">Duration</span>
+                  <p class="fact-val" id="video-fact-duration">--</p>
+                </div>
+                <div class="fact-item">
+                  <span class="fact-key">Analyzed Span</span>
+                  <p class="fact-val" id="video-fact-span">--</p>
+                </div>
+                <div class="fact-item">
+                  <span class="fact-key">Analysis Status</span>
+                  <p class="fact-val" id="video-fact-status">--</p>
+                </div>
+              </div>
+            </div>
+
+            <!-- Incident Hypothesis Card -->
+            <div class="form-group findings-group" id="video-hypothesis-container">
+              <label class="form-label">Incident Hypothesis
+                <span class="caveat-tag">⚠️ AI-generated hypothesis. Requires independent investigator verification.</span>
+              </label>
+              <div class="hypothesis-card">
+                <div class="hypothesis-header">
+                  <strong class="hypothesis-type" id="video-hyp-type">insufficient_evidence</strong>
+                  <span class="badge badge-status-ready"></span>
+                </div>
+                <p class="hypothesis-desc" id="video-hyp-desc">Awaiting video analysis...</p>
+              </div>
+            </div>
+
+            <!-- Inferred Visual Anchor Events -->
+            <div class="form-group findings-group" id="video-events-container">
+              <label class="form-label">Inferred Visual Anchor Events</label>
+              <div class="timeline-container" id="video-events-list"></div>
+            </div>
+
+            <!-- Sampled Frame Observations -->
+            <div class="form-group findings-group" id="video-observations-container">
+              <label class="form-label">Sampled Frame Observations (4 FPS)
+                <span class="caveat-tag">Per-frame detections; RT-DETR does not track persistent identities</span>
+              </label>
+              <div class="segments-list observations-scroll" id="video-frames-list"></div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Image Analysis Results Panel -->
+        <section class="panel results-panel" id="image-results-panel" style="display: none;" aria-labelledby="image-results-title">
+          <div class="panel-header">
+            <h2 class="panel-title" id="image-results-title">
+              <span class="panel-title-icon" aria-hidden="true">🖼️</span> Image Analysis Results
+            </h2>
+            <span class="badge badge-case" id="image-detection-count-badge">0 Detections</span>
+          </div>
+          <div class="panel-body">
+            <div id="image-facts-container" style="display: none;">
+              <div class="facts-grid">
+                <div class="fact-item">
+                  <span class="fact-key">Source File</span>
+                  <p class="fact-val" id="image-fact-file">--</p>
+                </div>
+                <div class="fact-item">
+                  <span class="fact-key">Top Scene</span>
+                  <p class="fact-val" id="image-fact-scene">--</p>
+                </div>
+                <div class="fact-item">
+                  <span class="fact-key">Detection Model</span>
+                  <p class="fact-val">RT-DETR</p>
+                </div>
+                <div class="fact-item">
+                  <span class="fact-key">Person Count</span>
+                  <p class="fact-val" id="image-fact-persons">--</p>
+                </div>
+              </div>
+            </div>
+
+            <div class="form-group findings-group" id="image-caption-group" style="display: none;">
+              <label class="form-label">AI-Generated Caption
+                <span class="caveat-tag">⚠️ Unverified — check against original</span>
+              </label>
+              <div class="transcript-display" id="image-caption-display"></div>
+            </div>
+
+            <div class="form-group findings-group" id="image-detections-group" style="display: none;">
+              <label class="form-label">Object Detections
+                <span class="caveat-tag" id="image-count-note"></span>
+              </label>
+              <div class="detection-list" id="image-detections-list"></div>
+            </div>
+
+            <div class="form-group findings-group" id="image-scene-group" style="display: none;">
+              <label class="form-label">Scene Classification
+                <span class="caveat-tag">Scores are relative across candidates; not calibrated probabilities.</span>
+              </label>
+              <div class="detection-list" id="image-scene-list"></div>
+            </div>
+
+            <div class="form-group findings-group" id="image-llm-group" style="display: none;">
+              <label class="form-label">AI Forensic Interpretation
+                <span class="caveat-tag">⚠️ AI-generated — requires human review before use in proceedings.</span>
+              </label>
+              <div class="llm-analysis-box" id="image-llm-display"></div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Evidence Facts & Transcript Panel (Audio) -->
+        <section class="panel results-panel" id="audio-facts-panel" style="display: none;" aria-labelledby="facts-panel-title">
+          <div class="panel-header">
+            <h2 class="panel-title" id="facts-panel-title">
+              <span class="panel-title-icon" aria-hidden="true">📋</span> Evidence Facts &amp; Transcript
+            </h2>
+          </div>
+          <div class="panel-body">
+            <div id="facts-container" style="display: none;">
+              <div class="facts-grid">
+                <div class="fact-item">
+                  <span class="fact-key">Source File</span>
+                  <p class="fact-val" id="fact-file">--</p>
+                </div>
+                <div class="fact-item">
+                  <span class="fact-key">Duration</span>
+                  <p class="fact-val" id="fact-duration">--</p>
+                </div>
+                <div class="fact-item">
+                  <span class="fact-key">Language</span>
+                  <p class="fact-val" id="fact-language">--</p>
+                </div>
+                <div class="fact-item">
+                  <span class="fact-key">Timestamp Quality</span>
+                  <p class="fact-val" id="fact-quality">--</p>
+                </div>
+              </div>
+            </div>
+
+            <div class="form-group findings-group">
+              <label class="form-label">Full Spoken Transcript</label>
+              <div class="transcript-display" id="transcript-display">Awaiting audio analysis...</div>
+            </div>
+
+            <div class="form-group findings-group">
+              <label class="form-label">Acoustic Segments</label>
+              <div class="segments-list" id="segments-list"></div>
+            </div>
+          </div>
+        </section>
+
+      </section>
+
+      <!-- =================================================================== -->
+      <!-- RIGHT PANE: Investigation Panel (Timeline, Fusion, Ask AI)          -->
+      <!-- =================================================================== -->
+      <aside class="pane-column pane-investigation" aria-label="Investigation Stream">
+
+        <!-- Investigation Navigation Switcher -->
+        <div class="investigation-tab-bar" role="tablist" aria-label="Investigation View Switcher">
+          <button type="button" class="inv-tab-btn active-inv-tab" id="inv-tab-timeline" role="tab" aria-selected="true" aria-controls="timeline-section-wrap">⏱ Timeline</button>
+          <button type="button" class="inv-tab-btn" id="inv-tab-fusion" role="tab" aria-selected="false" aria-controls="fusion-section-wrap">🧬 Fusion</button>
+          <button type="button" class="inv-tab-btn" id="inv-tab-chat" role="tab" aria-selected="false" aria-controls="chat-section-wrap">💬 Ask AI</button>
+          <button type="button" class="inv-tab-btn" id="inv-tab-all" role="tab" aria-selected="false" title="Show all investigation modules stacked">☷ All</button>
+        </div>
+
+        <!-- 1. Unified Forensic Timeline Panel -->
+        <div id="timeline-section-wrap" class="inv-section active-inv-section">
+          <section class="panel timeline-panel" aria-labelledby="timeline-panel-title">
+            <div class="panel-header">
+              <h2 class="panel-title" id="timeline-panel-title">
+                <span class="panel-title-icon" aria-hidden="true">⏱️</span> Unified Forensic Timeline
+              </h2>
+              <div class="timeline-header-actions">
+                <span class="badge badge-case" id="timeline-count-badge">0 Events</span>
+                <button class="btn btn-secondary btn-xs" id="btn-run-fusion" title="Run cross-modal evidence fusion (Activity 5.1)" type="button">⚡ Fuse Evidence</button>
+              </div>
+            </div>
+            <div class="panel-body">
+              <div id="timeline-empty-notice" class="timeline-empty-box">
+                <div class="empty-icon" aria-hidden="true">⏳</div>
+                <p class="empty-title">No timeline events generated yet</p>
+                <p class="empty-sub">Upload audio or video recordings to extract chronologically sorted anchor events.</p>
+              </div>
+
+              <div class="timeline-container" id="timeline-events-list" style="display: none;"></div>
+            </div>
+          </section>
+        </div>
+
+        <!-- 2. Multimodal Fusion & Alignments Panel -->
+        <div id="fusion-section-wrap" class="inv-section">
+          <section class="panel fusion-panel" aria-labelledby="fusion-panel-title">
+            <div class="panel-header">
+              <h2 class="panel-title" id="fusion-panel-title">
+                <span class="panel-title-icon" aria-hidden="true">🧬</span> Cross-Modal Fusion
+              </h2>
+              <div class="panel-actions">
+                <button type="button" class="btn btn-secondary btn-xs" id="btn-re-fuse" title="Re-run cross-modal evidence fusion">
+                  ⚡ Re-Fuse
+                </button>
+              </div>
+            </div>
+            <div class="panel-body fusion-panel-body">
+              <!-- Empty state notice when fusion has not been run -->
+              <div id="fusion-empty-notice" class="fusion-empty-notice">
+                <p>No cross-modal synthesis generated yet.</p>
+                <p class="empty-sub">Click <strong>⚡ Fuse Evidence</strong> on the timeline to run multimodal alignment.</p>
+              </div>
+
+              <!-- Main Fusion Container (hidden until fused) -->
+              <div id="fusion-main-container" class="fusion-main-container" style="display: none;">
+                <!-- SECTION A: Overview & Case Synthesis -->
+                <div id="fusion-summary-card" class="fusion-summary-card">
+                  <div class="fusion-card-header">
+                    <div class="fusion-card-title-group">
+                      <span class="fusion-card-title">Multimodal Evidence Synthesis</span>
+                      <span class="badge" id="fusion-alignment-badge">Aligned</span>
+                    </div>
+                    <span class="badge badge-case" id="fusion-anchors-badge">0 Anchors</span>
+                  </div>
+
+                  <!-- Executive Metrics Grid -->
+                  <div class="fusion-metrics-grid" id="fusion-metrics-grid">
+                    <div class="fusion-metric-item">
+                      <span class="fusion-metric-val" id="fusion-metric-relations">0</span>
+                      <span class="fusion-metric-lbl">Evidence Links</span>
+                    </div>
+                    <div class="fusion-metric-item">
+                      <span class="fusion-metric-val" id="fusion-metric-conflicts">0</span>
+                      <span class="fusion-metric-lbl">Conflicts</span>
+                    </div>
+                    <div class="fusion-metric-item">
+                      <span class="fusion-metric-val" id="fusion-metric-review">0</span>
+                      <span class="fusion-metric-lbl">Needs Review</span>
+                    </div>
+                    <div class="fusion-metric-item">
+                      <span class="fusion-metric-val" id="fusion-metric-events">0</span>
+                      <span class="fusion-metric-lbl">Total Events</span>
+                    </div>
+                  </div>
+
+                  <!-- Synthesis Summary Text -->
+                  <div class="fusion-synthesis-text" id="fusion-synthesis-text"></div>
+
+                  <!-- Evidence Gaps & Alignment Banner -->
+                  <div class="fusion-gaps-banner" id="fusion-gaps-banner" style="display: none;">
+                    <span class="fusion-gaps-icon">⚠️</span>
+                    <div class="fusion-gaps-content" id="fusion-gaps-content"></div>
+                  </div>
+                </div>
+
+                <!-- SECTION B: Key Findings (Grouped by investigative meaning) -->
+                <div id="fusion-key-findings-card" class="fusion-key-findings-card">
+                  <div class="fusion-section-header">
+                    <div class="fusion-header-left">
+                      <span class="fusion-section-title">🔍 Key Investigative Findings</span>
+                      <span class="badge badge-case" id="fusion-findings-count-badge">0 Findings</span>
+                    </div>
+                    <span class="fusion-section-hint">Observations grouped by investigative significance</span>
+                  </div>
+                  <div id="fusion-key-findings-list" class="fusion-key-findings-list"></div>
+                </div>
+
+                <!-- SECTION C: Evidence Relationships (Readable cards with source comparison) -->
+                <div id="fusion-relationships-card" class="fusion-relationships-card">
+                  <div class="fusion-section-header">
+                    <div class="fusion-header-left">
+                      <label class="form-label fusion-rel-label" style="margin: 0;">
+                        <span>🔗 Cross-Modal Relationships</span>
+                      </label>
+                      <span class="badge badge-case" id="fusion-rel-count-badge">0 Links</span>
+                    </div>
+                    <span class="fusion-section-hint">Correlations between distinct media sources</span>
+                  </div>
+                  <div id="fusion-relationships-list" class="fusion-relationships-list"></div>
+                </div>
+
+                <!-- SECTION D: Technical Evidence & Fusion Audit Trail (Collapsed by default) -->
+                <details class="fusion-audit-details" id="fusion-audit-details">
+                  <summary class="fusion-audit-summary">
+                    <span class="fusion-audit-title">🔬 Technical Evidence &amp; Fusion Audit Trail</span>
+                    <span class="fusion-audit-hint">View raw narrative, detector outputs &amp; SHA-256 ledger</span>
+                  </summary>
+                  <div class="fusion-audit-body">
+                    <!-- Grounded Narrative Card (Preserved for compatibility) -->
+                    <div class="fusion-audit-section">
+                      <h4 class="fusion-audit-subhead">Grounded Forensic Narrative</h4>
+                      <p id="fusion-narrative-text" class="fusion-narrative-text"></p>
+                      <div class="fusion-caveat-notice">
+                        ⚠️ Automated cross-modal synthesis. AI correlations require independent verification.
+                      </div>
+                    </div>
+
+                    <!-- Cryptographic Hash Index & Verification -->
+                    <div class="fusion-audit-section">
+                      <h4 class="fusion-audit-subhead">Deterministic Hash Index (SHA-256)</h4>
+                      <div class="fusion-hash-meta" id="fusion-hash-meta"></div>
+                    </div>
+
+                    <!-- Full Forensic Events Table -->
+                    <div class="fusion-audit-section">
+                      <h4 class="fusion-audit-subhead">Complete Forensic Event Ledger</h4>
+                      <div class="fusion-events-table-wrap" id="fusion-events-table-wrap"></div>
+                    </div>
+                  </div>
+                </details>
+              </div>
+            </div>
+          </section>
+        </div>
+
+        <!-- 3. Investigator AI Grounded Q&A Chat Panel -->
+        <div id="chat-section-wrap" class="inv-section">
+          <section class="panel chat-panel" aria-labelledby="chat-panel-title">
+            <div class="panel-header">
+              <h2 class="panel-title" id="chat-panel-title">
+                <span class="panel-title-icon" aria-hidden="true">💬</span> Investigator AI Q&amp;A Assistant
+              </h2>
+              <span class="badge badge-status-ready">Case Grounded</span>
+            </div>
+            <div class="panel-body chat-panel-body">
+              <p class="chat-intro-text">
+                Query grounded findings across all ingested evidence. Citations reference timestamps and media sources.
+              </p>
+
+              <!-- Expanded Messages Viewport -->
+              <div id="chat-messages-container" class="chat-messages-container" role="log" aria-live="polite">
+                <div class="chat-msg chat-msg-system">
+                  Ready for investigation queries. Ask about timeline events, person detections, or cross-modal correlations.
+                </div>
+              </div>
+
+              <!-- Suggested Query Chips -->
+              <div class="chat-query-chips" aria-label="Suggested questions">
+                <button type="button" class="chip-btn" data-query="Summarize key timeline events and anchors.">⏱ Summarize Timeline</button>
+                <button type="button" class="chip-btn" data-query="Who was observed and at what timestamps?">👤 Person Detections</button>
+                <button type="button" class="chip-btn" data-query="Are there any cross-modal conflicts or caveats?">⚠️ Check Conflicts</button>
+              </div>
+
+              <div class="chat-input-row">
+                <input type="text" class="form-input" id="chat-input" placeholder="e.g. What happened at timestamp 5.0s?">
+                <button class="btn btn-primary" id="btn-chat-send" type="button">Ask</button>
+              </div>
+            </div>
+          </section>
+        </div>
+
+        <!-- 4. Video & 3D Reconstruction Placeholder Panel -->
+        <div id="spatial-section-wrap" class="inv-section-compact">
+          <section class="panel spatial-panel" aria-labelledby="spatial-panel-title">
+            <div class="panel-header">
+              <h2 class="panel-title" id="spatial-panel-title">
+                <span class="panel-title-icon" aria-hidden="true">🎥</span> Spatial &amp; Video Analysis
+              </h2>
+              <span class="badge badge-placeholder">3D-Reconstruction</span>
+            </div>
+            <div class="panel-body">
+              <div class="placeholder-box">
+                <h3 class="placeholder-title">3D Gaussian Splatting &amp; Point Cloud Mapping</h3>
+                <p class="placeholder-desc">
+                  Surveillance 2D frame intelligence & 3D spatial reconstruction.
+                </p>
+              </div>
+            </div>
+          </section>
+        </div>
+
+      </aside>
+
+    </div>
+  </main>
+
+  <!-- Modal Dialog: Create New Case -->
+  <div id="new-case-modal" class="modal-backdrop" style="display: none;" role="dialog" aria-modal="true" aria-labelledby="modal-case-title">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 class="modal-title" id="modal-case-title">📁 Create Investigation Case</h3>
+        <button type="button" class="modal-close-btn" id="btn-close-modal" aria-label="Close dialog">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div id="modal-alert-box"></div>
+        <div class="form-group">
+          <label for="new-case-title" class="form-label">Case Title <span class="required-star">*</span></label>
+          <input type="text" id="new-case-title" class="form-input" placeholder="e.g. Incident 42 — High Street Alleyway" required>
+        </div>
+        <div class="form-group">
+          <label for="new-case-id" class="form-label">Custom Case ID (Optional)</label>
+          <input type="text" id="new-case-id" class="form-input" placeholder="e.g. CASE-2026-INCIDENT-042">
+          <p class="input-hint">Letters, numbers, hyphens, and underscores only. Leave blank for auto-generated ID.</p>
+        </div>
+        <div class="form-group">
+          <label for="new-case-desc" class="form-label">Case Description / Notes (Optional)</label>
+          <textarea id="new-case-desc" class="form-textarea" rows="3" placeholder="Forensic notes, location context, date/time parameters..."></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" id="btn-cancel-new-case">Cancel</button>
+        <button type="button" class="btn btn-primary" id="btn-submit-new-case">Create Investigation</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Forensic Notice Footer -->
+  <footer class="app-footer">
+    <div class="footer-content">
+      <p>
+        <strong>FORENSIC NOTICE:</strong> CrimeVisionAI is an investigative decision-support system for active case <span id="footer-case-id" class="footer-case-tag">CASE-2026-MVP-001</span>.
+        Automated speech recognition, anchor events, and AI hypotheses are probabilistic interpretations and do not constitute verified forensic facts.
+        Whisper timestamps represent approximate acoustic boundaries and must not be treated as millisecond-accurate measurements.
+        Independent human verification against original raw evidence is strictly required.
+      </p>
+    </div>
+  </footer>
+
+  <!-- Scripts -->
+  <script src="{{ url_for('static', filename='js/api.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html>
